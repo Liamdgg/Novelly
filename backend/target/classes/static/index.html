@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="assets/logo.png">
+    <title>Novelly - Online Novel Reading</title>
+    <!-- Swiper CSS (for carousel) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Spinner Overlay -->
+    <div id="spinner-overlay" class="hidden">
+        <div class="spinner-container">
+            <div class="spinner-ring"></div>
+            <p id="spinner-text" class="spinner-text">Loading...</p>
+        </div>
+    </div>
+
+    <div id = "app" class="app-container">
+        <div id = "page-content"></div>
+    </div>
+
+    <!-- External libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <!-- MOCK DATA (load FIRST) -->
+    <script src="js/data/mockData.js"></script>
+
+    <!-- Utilities -->
+    <script src="js/utils/validation.js"></script>
+    <script src="js/utils/htmlGenerators.js"></script>
+    <script src="js/utils/searchRenderer.js"></script>
+    
+    <!-- Spinner Component -->
+    <script src="js/components/Spinner.js"></script>
+    
+    <!-- State (load before API/Auth) -->
+    <script src="js/state.js"></script>
+    
+    <!-- API Client and Auth (load before components) -->
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+
+    <!-- Page Components (load BEFORE router) -->
+    <script src="js/components/Toast.js"></script>
+    <script src="js/components/header.js"></script>
+    <script src="js/components/swiper.js"></script>
+    <script src="js/components/chapterRenderer.js"></script>
+    <script src="js/components/login.js"></script>
+    <script src="js/components/register.js"></script>
+    <script src="js/components/home.js"></script>
+    <script src="js/components/novelDetail.js"></script>
+    <script src="js/components/reader.js"></script>
+    <script src="js/components/admin.js"></script>
+    <script src="js/components/search.js"></script>
+    <script src="js/components/profile.js"></script>
+    <script src="js/components/editProfile.js"></script>
+    <script src="js/components/library.js"></script>
+    
+    <!-- Router (load AFTER all components) -->
+    <script src="js/router.js"></script>
+    
+    <!-- Main -->
+    <script src="js/main.js"></script>
+</body>
+</html>

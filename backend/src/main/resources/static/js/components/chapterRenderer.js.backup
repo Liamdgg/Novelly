@@ -1,0 +1,298 @@
+// js/components/chapterRenderer.js
+// Chapter Text Renderer for Novel Reading
+
+// Reading preferences (stored in localStorage)
+const DEFAULT_READING_PREFS = {
+    fontSize: '18px',
+    fontFamily: 'Georgia, serif',
+    theme: 'light' // light, dark, sepia
+};
+
+// Load reading preferences from localStorage
+function loadReadingPreferences() {
+    const saved = localStorage.getItem('readingPreferences');
+    return saved ? JSON.parse(saved) : { ...DEFAULT_READING_PREFS };
+}
+
+// Save reading preferences to localStorage
+function saveReadingPreferences(prefs) {
+    localStorage.setItem('readingPreferences', JSON.stringify(prefs));
+}
+
+// Render chapter text content in the reader
+function renderChapterText(chapterContent, options = {}) {
+    if (!chapterContent) {
+        showError('No content found for this chapter');
+        return;
+    }
+    
+    const container = document.getElementById('reader-container');
+    if (!container) {
+        console.error('Reader container not found');
+        return;
+    }
+    
+    showSpinner('Loading chapter images...');
+    
+    // Generate HTML for all images (vertical scrolling) with lazy loading
+    const imagesHTML = images.map((imgUrl, index) => `
+        <div class="chapter-page" data-page="${index + 1}">
+            <img 
+                data-src="${imgUrl}" 
+                alt="Page ${index + 1}"
+                data-page="${index + 1}"
+                onload="handleImageLoad()"
+                onerror="handleImageError(this, ${index + 1})"
+                class="lazy-load"
+            />
+            <div class="image-placeholder">Loading page ${index + 1}...</div>
+        </div>
+    `).join('');
+    
+    // Add chapter navigation at the end
+    const navigationHTML = `
+        <div class="chapter-navigation">
+            <button id="prev-chapter-btn" class="btn btn-secondary" onclick="goToPreviousChapter()">
+                ⬅️ Previous Chapter
+            </button>
+            <select id="bottom-chapter-selector" class="chapter-dropdown" onchange="handleBottomChapterChange()">
+                <option value="">Select Chapter</option>
+            </select>
+            <button id="next-chapter-btn" class="btn btn-secondary" onclick="goToNextChapter()">
+                Next Chapter ➡️
+            </button>
+        </div>
+    `;
+    
+    container.innerHTML = imagesHTML + navigationHTML;
+    
+    // No page counter to update
+    
+    // Setup scroll tracking instead of keyboard navigation
+    setupScrollTracking(options.novelId, options.chapterId);
+    
+    // Initialize lazy loading
+    initLazyLoading();
+    
+    // Initial progress tracking
+    if (options.novelId && options.chapterId) {
+        trackReadingProgress(options.novelId, options.chapterId, readerCurrentPage);
+    }
+}
+
+// Initialize lazy loading with Intersection Observer
+function initLazyLoading() {
+    const lazyImages = document.querySelectorAll('.lazy-load');
+    
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const placeholder = img.nextElementSibling;
+                
+                // Load image
+                img.src = img.dataset.src;
+                img.classList.remove('lazy-load');
+                
+                // Preserve original onload (handleImageLoad) and also remove placeholder
+                const originalOnload = img.onload;
+                img.onload = function(e) {
+                    if (typeof originalOnload === 'function') {
+                        originalOnload.call(this, e);
+                    }
+                    if (placeholder && placeholder.classList.contains('image-placeholder')) {
+                        placeholder.remove();
+                    }
+                };
+                
+                // Unobserve this image
+                observer.unobserve(img);
+            }
+        });
+    }, {
+        root: null,
+        rootMargin: '50px', // Start loading 50px before entering viewport
+        threshold: 0.01
+    });
+    
+    lazyImages.forEach(img => {
+        imageObserver.observe(img);
+    });
+}
+
+// Handle successful image load
+function handleImageLoad() {
+    readerLoadedImages++;
+    
+    if (readerLoadedImages === 1) {
+        // Hide spinner when first image loads
+        hideSpinner();
+    }
+    
+    // Update progress if needed
+    const progress = (readerLoadedImages / readerTotalPages) * 100;
+    console.log(`Loading progress: ${progress.toFixed(0)}%`);
+}
+
+// Handle image load error
+function handleImageError(img, pageNumber) {
+    console.error(`Failed to load page ${pageNumber}`);
+    img.src = 'assets/placeholder.png';
+    img.alt = `Failed to load page ${pageNumber}`;
+    img.classList.add('error-image');
+    
+    // Still count as loaded to prevent infinite spinner
+    readerLoadedImages++;
+    if (readerLoadedImages >= readerTotalPages) {
+        hideSpinner();
+    }
+}
+
+// Setup scroll tracking to detect current page
+function setupScrollTracking(novelId, chapterId) {
+    let scrollTimeout;
+    
+    window.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        
+        scrollTimeout = setTimeout(() => {
+            // Find which page is currently in viewport
+            const pages = document.querySelectorAll('.chapter-page');
+            let currentPageInView = 1;
+            
+            pages.forEach((page, index) => {
+                const rect = page.getBoundingClientRect();
+                const windowHeight = window.innerHeight;
+                
+                // Check if page is in viewport (at least 50% visible)
+                if (rect.top < windowHeight * 0.5 && rect.bottom > windowHeight * 0.5) {
+                    currentPageInView = index + 1;
+                }
+            });
+            
+            if (currentPageInView !== readerCurrentPage) {
+                readerCurrentPage = currentPageInView;
+                // No page counter to update
+                updateNavigationButtons();
+                
+                if (novelId && chapterId) {
+                    trackReadingProgress(novelId, chapterId, readerCurrentPage);
+                }
+            }
+        }, 100);
+    });
+}
+
+// Navigate to next page
+function goToNextPage() {
+    if (readerCurrentPage < readerTotalPages) {
+        navigateToPage(readerCurrentPage + 1);
+    }
+}
+
+// Navigate to previous page
+function goToPreviousPage() {
+    if (readerCurrentPage > 1) {
+        navigateToPage(readerCurrentPage - 1);
+    }
+}
+
+// Navigate to specific page (scroll into view)
+function navigateToPage(pageNum) {
+    if (pageNum < 1 || pageNum > readerTotalPages) return;
+    
+    const targetPage = document.querySelector(`.chapter-page[data-page="${pageNum}"]`);
+    if (targetPage) {
+        targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        readerCurrentPage = pageNum;
+        // No page counter to update
+        updateNavigationButtons();
+        
+        // Track progress
+        const readerState = window.readerState;
+        if (readerState && readerState.novelId && readerState.chapterId) {
+            trackReadingProgress(readerState.novelId, readerState.chapterId, readerCurrentPage);
+        }
+    }
+}
+
+// Update navigation button states
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+    
+    if (prevBtn) {
+        prevBtn.disabled = readerCurrentPage <= 1;
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = readerCurrentPage >= readerTotalPages;
+    }
+}
+
+// Show error message
+function showError(message) {
+    const container = document.getElementById('reader-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="reader-error">
+                <div class="error-icon">⚠️</div>
+                <h2>Oops! Something went wrong</h2>
+                <p>${message}</p>
+                <button class="btn btn-primary" onclick="navigateTo('#/home')">
+                    Return to Home
+                </button>
+            </div>
+        `;
+    }
+    hideSpinner();
+}
+
+// Track reading progress (silently in background)
+let progressTrackTimeout = null;
+function trackReadingProgress(novelId, chapterId, pageNumber) {
+    // Debounce to avoid too many calls
+    clearTimeout(progressTrackTimeout);
+    
+    progressTrackTimeout = setTimeout(() => {
+        // Save to localStorage
+        const progressKey = `reading_progress_${novelId}`;
+        const progress = {
+            novelId,
+            chapterId,
+            pageNumber,
+            timestamp: new Date().toISOString()
+        };
+        
+        localStorage.setItem(progressKey, JSON.stringify(progress));
+        
+        // TODO: Send to API in production
+        // fetch('/api/reading-progress', {
+        //     method: 'POST',
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify(progress)
+        // });
+        
+        console.log('Reading progress tracked:', progress);
+    }, 2000); // Track after 2 seconds on same page
+}
+
+// Get current page number
+function getCurrentPage() {
+    return readerCurrentPage;
+}
+
+// Get total pages
+function getTotalPages() {
+    return readerTotalPages;
+}
+
+// Make functions globally available
+window.renderChapterImages = renderChapterImages;
+window.handleImageLoad = handleImageLoad;
+window.handleImageError = handleImageError;
+window.goToNextPage = goToNextPage;
+window.goToPreviousPage = goToPreviousPage;
+window.navigateToPage = navigateToPage;
+window.getCurrentPage = getCurrentPage;
+window.getTotalPages = getTotalPages;
